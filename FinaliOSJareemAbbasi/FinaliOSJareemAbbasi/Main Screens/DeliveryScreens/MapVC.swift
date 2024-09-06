@@ -9,23 +9,27 @@ import UIKit
 import MapKit
 import CoreLocation
 
-class MapVC: UIViewController, CLLocationManagerDelegate {
-
-    @IBOutlet weak var addressTextField: UITextField!
+class MapVC: UIViewController, CLLocationManagerDelegate, UISearchBarDelegate {
+    
+    @IBOutlet weak var doneButton: UIBarButtonItem!
+    @IBOutlet weak var addressView: UIView!
     @IBOutlet weak var mapView: MKMapView!
     @IBOutlet weak var addressLabel: UILabel!
     @IBOutlet weak var dropOffLabel: UILabel!
+    @IBOutlet weak var searchBar: UISearchBar!
     
     let locationManager = CLLocationManager()
     var myGeoCoder = CLGeocoder()
     var performingReverseGeocoding = false
     var placemark: CLPlacemark?
     var lastGeocodingError: Error?
-
+    var userLocation: MKCoordinateRegion?
+    var locationInPakistan = ""
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        searchBar.delegate = self
         UI()
-        addressTextField.delegate = self
         mapView.delegate = self
     }
     
@@ -33,21 +37,36 @@ class MapVC: UIViewController, CLLocationManagerDelegate {
         super.viewDidAppear(animated)
         locationManager.delegate = self
     }
-    //MARK: ~ First Part
     
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
-        print("error in getting location\(error.localizedDescription)")
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        
-        let newLocation = locations.last
-        print("last location\(String(describing: newLocation))")
-        
-        if let location = locations.last {
-            reverseGeocode(location: location)
-            render(location)
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+            searchBar.resignFirstResponder()
+            
+            let searchRequest = MKLocalSearch.Request()
+            searchRequest.naturalLanguageQuery = searchBar.text
+            
+            let activeSearch = MKLocalSearch(request: searchRequest)
+            activeSearch.start { (response, error) in
+                if let response = response {
+                    self.mapView.removeAnnotations(self.mapView.annotations)
+                    let latitude = response.boundingRegion.center.latitude
+                    let longitude = response.boundingRegion.center.longitude
+                    let location = CLLocation(latitude: latitude, longitude: longitude)
+                    self.render(location)
+                    self.reverseGeocode(location: location)
+                } else {
+                    let alert = UIAlertController(title: "Location not found", message: "Please search again", preferredStyle: .alert)
+                    let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+                    alert.addAction(okAction)
+                    self.present(alert, animated: true, completion: nil)
+                }
+            }
         }
+    //MARK: ~ First Part
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let alert = UIAlertController(title: "Location not found", message: error.localizedDescription, preferredStyle: .alert)
+        let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+        alert.addAction(okAction)
+        self.present(alert, animated: true, completion: nil)
     }
     //MARK: GPT
     func reverseGeocode(location: CLLocation) {
@@ -56,12 +75,11 @@ class MapVC: UIViewController, CLLocationManagerDelegate {
                 print("Failed to reverse geocode location: \(error.localizedDescription)")
                 return
             }
-
             if let placemark = placemarks?.first {
                 let address = ("\(placemark.name ?? ""),\(placemark.locality ?? ""),\(placemark.administrativeArea ?? ""),\(placemark.postalCode ?? ""),\(placemark.country ?? "")")
-                
-                self.addressLabel.text = address
-                print("Address: \(address)")
+                if self.locationInPakistan == "true" {
+                    self.addressLabel.text = address
+                }
             }
         }
     }
@@ -70,99 +88,119 @@ class MapVC: UIViewController, CLLocationManagerDelegate {
     func render(_ location: CLLocation) {
         
         let coordinate = CLLocationCoordinate2D(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
-        let span = MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
-        let region = MKCoordinateRegion(center: coordinate, span: span)
-        mapView.setRegion(region, animated: true)
+        if isLocationInPakistan(location: coordinate) == true {
+            let span = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            let region = MKCoordinateRegion(center: coordinate, span: span)
+            userLocation = region
+            locationInPakistan = "true"
+            mapView.setRegion(region, animated: true)
+            
+            let pin = MKPointAnnotation()
+            pin.coordinate = coordinate
+            pin.title = "Delivery address"
+            mapView.addAnnotation(pin)
         
-        let pin = MKPointAnnotation()
-        pin.coordinate = coordinate
-        mapView.addAnnotation(pin)
+        } else {
+            let alert = UIAlertController(title: "Service Unavailable", message: "This service is only available in Pakistan.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+            self.present(alert, animated: true, completion: nil)
+        }
     }
-    
-    //MARK: ~ third Part
+    func checkLocationAuthorization() {
+            switch locationManager.authorizationStatus {
+            case .notDetermined:
+                locationManager.requestWhenInUseAuthorization()
+            case .restricted, .denied:
+                showLocationAccessDeniedAlert()
+            case .authorizedWhenInUse, .authorizedAlways:
+                locationManager.startUpdatingLocation()
+            @unknown default:
+                break
+            }
+        }
+    func showLocationAccessDeniedAlert() {
+        let alert = UIAlertController(title: "Location Access Denied",
+                                      message: "Please enable location services in Settings to use this feature.",
+                                      preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Open Settings", style: .default, handler: { _ in
+            if let appSettings = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(appSettings)
+            }
+        }))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+        present(alert, animated: true)
+    }
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        checkLocationAuthorization()
+    }
 
+    //MARK: ~ third Part
+    
     @IBAction func navigationButtonClicked(_ sender: UIButton) {
         
-        let authStatus = CLLocationManager.authorizationStatus()
-        if authStatus == .notDetermined {
-            locationManager.requestWhenInUseAuthorization()
-            return
-        }
-        if authStatus == .notDetermined || authStatus == .restricted {
-            showLocationServicesDenieddAler()
-            return
-        }
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
-    }
-    
-    //MARK: ~ second Part
-    
-    @IBAction func searchButtonClicked(_ sender: UIButton) {
-      
-        myGeoCoder.geocodeAddressString(addressTextField.text ?? "") { (placemark, error) in
-            self.processResponse(withPlacemarks: placemark, error: error)
+        if let location = locationManager.location {
+            reverseGeocode(location: location)
+            render(location)
         }
     }
     
-    func processResponse(withPlacemarks placemarks: [CLPlacemark]?, error: Error?) {
-        if let error = error {
-            print("Error in processResponse MapVC\(error.localizedDescription)")
-        } else {
-            var location: CLLocation?
-            if let placemarks = placemarks, placemarks.count > 0 {
-                location = placemarks.first?.location
-            }
-            if let location = location {
-                let coordinate = location.coordinate
-                let request = MKDirections.Request()
-                request.source = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: locationManager.location?.coordinate.latitude ?? 0.0, longitude: locationManager.location?.coordinate.longitude ?? 0.0), addressDictionary: nil))
-                request.destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude), addressDictionary: nil))
-                request.transportType = .any
-                request.requestsAlternateRoutes = true
-                
-                let diretions = MKDirections(request: request)
-                diretions.calculate { response, error in
-                    print("error in finding route\(String(describing: error?.localizedDescription))")
-                    guard let directionsResponse = response else {
-                        return
-                    }
-                    for route in directionsResponse.routes {
-                        self.mapView.addOverlay(route.polyline)
-                        self.mapView.setVisibleMapRect(route.polyline.boundingMapRect, animated: true)
-                    }
-                }
-                let pin = MKPointAnnotation()
-                pin.coordinate = coordinate
-                pin.title = addressTextField.text
-                mapView.addAnnotation(pin)
-            }
-        }
-    }
-    func mapView(_ mapView: MKMapView, rendererFor overlay: any MKOverlay) -> MKOverlayRenderer {
-        let renderer = MKPolylineRenderer(polyline: overlay as! MKPolyline)
-        renderer.strokeColor = .blue
-        renderer.lineWidth = 4.0
-        renderer.alpha = 1.0
-        return renderer
-    }
     @IBAction func doneButtonPressed(_ sender: UIBarButtonItem) {
-        performSegue(withIdentifier: "LocationSuccess", sender: self)
+        if addressLabel.text != "" {
+            performSegue(withIdentifier: "LocationSuccess", sender: self)
+        } else {
+            let alert = UIAlertController(title: "Location not found", message: "Please enter your address", preferredStyle: .alert)
+            let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+            alert.addAction(okAction)
+            present(alert, animated: true, completion: nil)
+        }
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "LocationSuccess" {
+            let controller = segue.destination as? FuelDetailsVC
+            if let address = addressLabel.text {
+                controller?.deliveryAddress = address
+                controller?.userLocation = userLocation
+            }
+        }
     }
 }
 
 extension MapVC: UITextFieldDelegate, MKMapViewDelegate {
     
     func UI() {
+        
+        doneButton.tintColor = .systemBlue
+        
         dropOffLabel.layer.borderColor = UIColor.black.cgColor
         dropOffLabel.layer.borderWidth = 2.0
         dropOffLabel.layer.cornerRadius = 10.0
         dropOffLabel.layer.masksToBounds = true
         
-        addressTextField.layer.borderColor = UIColor.black.cgColor
-        addressTextField.layer.borderWidth = 2.0
-        addressTextField.layer.cornerRadius = 10.0
+        addressView.layer.shadowColor = UIColor.black.cgColor
+        addressView.layer.shadowOpacity = 0.5
+        addressView.layer.shadowOffset = CGSize(width: 5, height: 5)
+        addressView.layer.shadowRadius = 10
+        
+        addressView.layer.cornerRadius = 10.0
+    }
+    func isLocationInPakistan(location: CLLocationCoordinate2D) -> Bool {
+        let latitude = location.latitude
+        let longitude = location.longitude
+        let maxLatitude: CLLocationDegrees = 37.0841
+        let minLatitude: CLLocationDegrees = 23.6345
+        let maxLongitude: CLLocationDegrees = 77.8375
+        let minLongitude: CLLocationDegrees = 60.8728
+        if latitude >= minLatitude && latitude <= maxLatitude &&
+           longitude >= minLongitude && longitude <= maxLongitude {
+            return true
+        } else {
+            locationInPakistan = "false"
+            return false
+        }
     }
     
     func showLocationServicesDenieddAler() {

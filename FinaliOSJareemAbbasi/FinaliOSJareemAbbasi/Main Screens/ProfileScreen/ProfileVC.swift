@@ -20,7 +20,6 @@ class ProfileVC: UIViewController {
     @IBOutlet weak var logoutButton: UIButton!
     @IBOutlet weak var userPhoto: UIImageView!
     
-    
     let locationManager = CLLocationManager()
     let db = Firestore.firestore()
     
@@ -56,19 +55,21 @@ class ProfileVC: UIViewController {
         }
     }
     func retrievePhots() {
-        db.collection(sender!).getDocuments { snapchot, error in
-            if error == nil && snapchot != nil {
-                var paths = [String]()
-                for doc in snapchot!.documents {
-                    paths.append(doc["URL"] as! String)
-                }
-                for path in paths {
-                    let storageRef = Storage.storage().reference()
-                    let fileRef = storageRef.child(path)
-                    fileRef.getData(maxSize: 5 * 1024 * 1024) { result in
-                        switch result {
-                        case .success(let data):
-                            if let image = UIImage(data: data) {
+            let documentID = "UserData"
+
+            db.collection(sender!).document(documentID).getDocument { document, error in
+                if let document = document, document.exists {
+                    if let path = document["URL"] as? String {
+                        let storageRef = Storage.storage().reference()
+                        let fileRef = storageRef.child(path)
+                        
+                        fileRef.getData(maxSize: 5 * 1024 * 1024) { data, error in
+                            if let error = error {
+                                print("Error occurred: \(error.localizedDescription)")
+                                if error.localizedDescription.contains("does not exist") {
+                                    print("The specified file does not exist. Please check the path and try again.")
+                                }
+                            } else if let data = data, let image = UIImage(data: data) {
                                 print("Image successfully retrieved.")
                                 DispatchQueue.main.async {
                                     self.userPhoto.image = image
@@ -76,16 +77,14 @@ class ProfileVC: UIViewController {
                             } else {
                                 print("Failed to convert data to image.")
                             }
-                        case .failure(let error):
-                            print("Error occurred: \(error.localizedDescription)")
-                            if error.localizedDescription.contains("does not exist") {
-                                print("The specified file does not exist. Please check the path and try again.")
-                            }
                         }
+                    } else {
+                        print("URL not found in document.")
                     }
+                } else {
+                    print("Document does not exist or there was an error: \(error?.localizedDescription ?? "Unknown error")")
                 }
             }
-        }
     }
     
     func UI() {
@@ -99,7 +98,6 @@ class ProfileVC: UIViewController {
         logoutButton.layer.shadowRadius = 10
         
         userPhoto.layer.cornerRadius = userPhoto.frame.size.width/2.0
-        
     }
     
     @IBAction func logoutButtonClicked(_ sender: UIButton) {
@@ -115,6 +113,7 @@ class ProfileVC: UIViewController {
     }
     
 }
+
 extension ProfileVC: CLLocationManagerDelegate {
     
     @IBAction func swicthButtonClicked(_ sender: UISwitch) {
@@ -122,18 +121,26 @@ extension ProfileVC: CLLocationManagerDelegate {
     }
     @objc func locationSwitchChanged(_ sender: UISwitch) {
         if sender.isOn {
-            // Check if location services are enabled
             if CLLocationManager.locationServicesEnabled() {
                 locationManager.startUpdatingLocation()
-                print("Location Services Enabled")
+                let alert = UIAlertController(title: "Alert",
+                                              message: "Location Services Enabled", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "Dismiss",
+                                              style: .cancel,
+                                              handler: nil))
+                self.present(alert, animated: true)
             } else {
-                // Prompt the user to enable Location Services
                 showLocationServicesAlert()
-                sender.setOn(false, animated: true) // revert switch to off
+                sender.setOn(false, animated: true)
             }
         } else {
             locationManager.stopUpdatingLocation()
-            print("Location Services Disabled")
+            let alert = UIAlertController(title: "Alert",
+                                          message: "Location Services Disabled", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Dismiss",
+                                          style: .cancel,
+                                          handler: nil))
+            self.present(alert, animated: true)
         }
     }
 
@@ -151,14 +158,13 @@ extension ProfileVC: CLLocationManagerDelegate {
         }))
         present(alert, animated: true, completion: nil)
     }
+    
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         print("User's location: \(location)")
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("Failed to find user's location: \(error.localizedDescription)")
+        print("Failed to find user's location: \(error)")
     }
-
-
 }

@@ -8,82 +8,85 @@
 import UIKit
 
 class CarModelYearTBVC: UITableViewController {
-
+    
+    var modelYear = ModelYear()
+    var filteredYears: [String] = []
+    var carCompany1 = ""
+    var carModel1 = ""
+    var roadSideServiceSelected3 = ""
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        // Uncomment the following line to preserve selection between presentations
-        // self.clearsSelectionOnViewWillAppear = false
-
-        // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-        // self.navigationItem.rightBarButtonItem = self.editButtonItem
+        
+        let imageView = UIImageView(image: UIImage(named: "mechanics-logo-black 2"))
+        imageView.contentMode = .scaleAspectFit
+           imageView.frame = CGRect(x: 0, y: 0, width: 100, height: 40)
+        self.navigationItem.titleView = imageView
+        
+        filteredYears = modelYear.year
+        tableView.register(UINib(nibName: "YearSearchFieldCell", bundle: nil), forCellReuseIdentifier: "Cell2")
     }
 
     // MARK: - Table view data source
 
     override func numberOfSections(in tableView: UITableView) -> Int {
-        // #warning Incomplete implementation, return the number of sections
-        return 0
+        return 2
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        // #warning Incomplete implementation, return the number of rows
-        return 0
+        if section == 0 {
+            return 1
+        } else {
+            return filteredYears.count
+        }
     }
-
-    /*
+    
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "reuseIdentifier", for: indexPath)
-
-        // Configure the cell...
-
-        return cell
+        if indexPath.section == 0 {
+            guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell2", for: indexPath)  as? YearSearchFieldCell else {
+                return UITableViewCell()
+            }
+            tableView.rowHeight = 110
+            cell.searchBar.delegate = self
+            return cell
+        } else {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "yearCell", for: indexPath)
+            cell.textLabel?.text = filteredYears[indexPath.row]
+            tableView.rowHeight = 60.0
+            return cell
+        }
     }
-    */
-
-    /*
-    // Override to support conditional editing of the table view.
-    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
-        // Return false if you do not want the specified item to be editable.
-        return true
+    
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        if roadSideServiceSelected3 == "true" {
+            performSegue(withIdentifier: "roadSideServiceSelected", sender: self)
+        } else {
+            performSegue(withIdentifier: "yearSelected", sender: self)
+        }
     }
-    */
-
-    /*
-    // Override to support editing the table view.
-    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-        if editingStyle == .delete {
-            // Delete the row from the data source
-            tableView.deleteRows(at: [indexPath], with: .fade)
-        } else if editingStyle == .insert {
-            // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
-        }    
-    }
-    */
-
-    /*
-    // Override to support rearranging the table view.
-    override func tableView(_ tableView: UITableView, moveRowAt fromIndexPath: IndexPath, to: IndexPath) {
-
-    }
-    */
-
-    /*
-    // Override to support conditional rearranging of the table view.
-    override func tableView(_ tableView: UITableView, canMoveRowAt indexPath: IndexPath) -> Bool {
-        // Return false if you do not want the item to be re-orderable.
-        return true
-    }
-    */
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
+        if segue.identifier == "yearSelected" {
+            let controller = segue.destination as? CarPartsDetailsTBVC
+            controller?.carModel = carModel1
+            controller?.carCompany = carCompany1
+        }
+        if segue.identifier == "roadSideServiceSelected" {
+            let controller = segue.destination as? AddressVC
+            controller?.roadSideAssistanceSelected = "true"
+        }
     }
-    */
-
 }
+
+extension CarModelYearTBVC: UISearchBarDelegate {
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        if searchBar.text!.isEmpty {
+            filteredYears = modelYear.year
+            tableView.reloadData()
+            return
+        }
+        filteredYears = modelYear.year.filter { return $0.contains(searchBar.text!) }
+        tableView.reloadData()
+    }
+}
+

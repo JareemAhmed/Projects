@@ -17,22 +17,45 @@ class InitialVC: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        textLabel.text = """
+        Fuel at Your Doorstep.
+        Never Run Out Again.
+"""
     }
 
     @IBAction func nextButton(_ sender: UIButton) {
         
-        if textLabel.text == "In Swift, you can easily toggle the text of a label and the image in an image view using a single button."  {
+        if textLabel.text == """
+        Fuel at Your Doorstep.
+        Never Run Out Again.
+"""
+        {
           
             imageView.image = UIImage(named: "2")
             nextButton.setImage(UIImage(named: "4"), for: .normal)
-            textLabel.text = "By leveraging the @IBAction function linked to the button's click event, you can alternate between two states."
+            textLabel.text = """
+            Quality Parts Delivered Fast.
+            Get What Your Vehicle Needs.
+"""
             
-        } else if textLabel.text == "By leveraging the @IBAction function linked to the button's click event, you can alternate between two states." {
+        } else if textLabel.text == """
+            Quality Parts Delivered Fast.
+            Get What Your Vehicle Needs.
+"""
+ {
             imageView.image = UIImage(named: "3")
             nextButton.setImage(UIImage(named: "6"), for: .normal)
-            textLabel.text = "This simple setup allows for dynamic UI updates with minimal code."
+            textLabel.text = """
+            Help is On the Way.
+            24/7 Roadside Assistance.
+"""
             
-        } else if textLabel.text == "This simple setup allows for dynamic UI updates with minimal code." {
+        } else if textLabel.text == """
+            Help is On the Way.
+            24/7 Roadside Assistance.
+""" 
+        {
             performSegue(withIdentifier: "login", sender: self)
         }
     }
