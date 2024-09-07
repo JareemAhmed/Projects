@@ -1,0 +1,23 @@
+{
+  "images" : [
+    {
+      "filename" : "pixlr-image-generator-66d1b77edf2e1c40b920cffa.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "pixlr-image-generator-66d1b77edf2e1c40b920cffa@2x.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "pixlr-image-generator-66d1b77edf2e1c40b920cffa@3x.png",
+      "idiom" : "universal",
+      "scale" : "3x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
